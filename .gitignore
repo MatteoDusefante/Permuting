@@ -1,0 +1,14 @@
+/eigen
+/boost_lib
+/plots
+benchmark1.cpp
+benchmark2.cpp
+misc.h
+parser.cpp
+Archive.zip
+copy_remote.sh
+permutation.cpp
+permutation.h
+spmxv.cpp
+testBucket.cpp
+utl.h
