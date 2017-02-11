@@ -12,3 +12,4 @@ permutation.h
 spmxv.cpp
 testBucket.cpp
 utl.h
+papi_omp.cpp
