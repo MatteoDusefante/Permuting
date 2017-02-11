@@ -41,46 +41,6 @@ typedef struct data {
    };
 } data;
 
-/*
-class Type {
-public:
-    Type();
-    Type operator=(const double &rhs);
-    Type operator=(const Type &rhs);
-    Type operator+=(const Type &rhs);
-    Type operator/=(const int &rhs);
-
-    size_t x;
-};
-
-Type::Type() {
-    x = 0;
-}
-
-Type Type::operator=(const Type &rhs) {
-
-    x = rhs.x;
-    return *this;
-}
-
-Type Type::operator=(const double &rhs) {
-
-    x = rhs;
-    return *this;
-}
-
-Type Type::operator+=(const Type &rhs) {
-
-    x += rhs.x;
-    return *this;
-}
-
-Type Type::operator/=(const int &rhs) {
-
-    x /= rhs;
-    return *this;
-}
-*/
 /******************************************************************************************/
 
 template <typename T>
@@ -90,10 +50,6 @@ void copy(T **source, T **destination, T *pointers_length, size_t layers) {
       for (auto it = 0; it < pointers_length[ly] + 1; ++it)
          destination[ly][it] = source[ly][it];
 }
-
-/******************************************************************************************/
-
-void print_sep() { printf("***********************************\n"); }
 
 /******************************************************************************************/
 
@@ -133,11 +89,11 @@ void random_permutation_table(T **table, size_t length, size_t layers) {
 
    for (size_t i = 0; i < length; ++i)
       table[0][i] = i;
-   /*
-      for(size_t i = 0; i < length; ++i) {
-         size_t index = (std::rand() % (length - i)) + i;
-         std::swap(table[0][index], table[0][i]);
-      }*/
+
+   for (size_t i = 0; i < length; ++i) {
+      size_t index = (std::rand() % (length - i)) + i;
+      std::swap(table[0][index], table[0][i]);
+   }
 
    for (size_t ly = 1; ly < layers; ++ly) {
       for (size_t i = 0; i < length; ++i)
@@ -210,33 +166,5 @@ template <typename T, typename S> void verify(T *out_p, S *out, size_t length) {
    utils::verify(out_p, out, length, false);
 }
 
-/******************************************************************************************/
 
-#ifdef ALLOCATE
-template <typename T> int *allocate(T name, size_t size) {
-
-   const size_t prefix = 64;
-
-   int *start = (int *)mmap(NULL, size + prefix, PROT_WRITE | PROT_READ,
-                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
-
-   if (start == (void *)-1) {
-      std::cout << "failed to use mmap for " << name;
-      exit(EXIT_FAILURE);
-   }
-   *((long long int *)start) = size;
-   return start + prefix;
-}
-#endif
-
-/******************************************************************************************/
-
-template <typename T> void fill(T *start, T *end, size_t bucket_size) {
-
-   *start++ = 0;
-
-   for (; start != end; ++start)
-      *start = *(start - 1) + bucket_size;
-   return;
-}
 }
