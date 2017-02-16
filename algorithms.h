@@ -182,7 +182,6 @@ inline void parallel_bucket(T **table_in, T **table_perm, T **table_pt, T *out,
          bucket = floor(table_perm[ly][it] / bucket_size[ly + 1]);
          index = table_pt[ly][c * buckets[ly] + bucket]++;
          table_in[ly + 1][index] = table_in[ly][it];
-         // table_perm[ly + 1][index] = table_perm[ly][it];
       }
    }
 
