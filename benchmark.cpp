@@ -12,17 +12,17 @@ int main(int argc, char *argv[]) {
 
    int start = 100000000;
    int end = 100000000;
-   int delta = end - start / 10;
+   int delta = start; // end - start / 10;
    int events = EVENTS;
    int buckets = 1;
    int layers = 1;
 
-   int nbuckets1[] = {100};
-   int nbuckets2[] = {100};
+   int nbuckets1[] = {10000};
+   int nbuckets2[] = {10000};
 
    if (argc > 2) {
       start = atoi(argv[1]);
-      end =  atoi(argv[2]);
+      end = atoi(argv[2]);
       delta = end - start / 10;
       nbuckets1[0] = nbuckets2[0] = atoi(argv[3]);
    }
@@ -33,7 +33,9 @@ int main(int argc, char *argv[]) {
    out.open("output.txt", std::ios_base::app);
 
    long *out_a = new long[end];
+#ifdef BUCKET
    long *out_b = new long[end];
+#endif
    long *out_d = new long[end];
    long *out_p = new long[end];
    long *tnb = new long[layers];
@@ -59,13 +61,20 @@ int main(int argc, char *argv[]) {
 
    int cores = std::thread::hardware_concurrency();
 
+#ifdef BUCKET
    utils::data *results_direct, *results_bucket, *results_eigen, *results_table,
        *results_parallel;
+#else
+   utils::data *results_direct, *results_eigen, *results_table,
+       *results_parallel;
+#endif
 
    for (int length = start; length < end + delta; length += delta) {
 
       results_direct = new utils::data();
+#ifdef BUCKET
       results_bucket = new utils::data();
+#endif
       results_eigen = new utils::data();
       results_table = new utils::data();
       results_parallel = new utils::data();
@@ -91,9 +100,11 @@ int main(int argc, char *argv[]) {
          for (int ly = 1; ly < layers; ++ly)
             tnb[ly] = cores; // tnb[ly - 1] * 100;
 
+#ifdef BUCKET
          benchmark::omp_bucket_algorithm(&table_in[0], &table_perm[0], &tnb[0],
                                          &out_p[0], &out_b[0], length, layers,
                                          events, cores, results_bucket);
+#endif
 
          benchmark::omp_table_algorithm(&table_in[0], &table_perm[0], &tnb[0],
                                         &out_p[0], length, layers, events,
@@ -112,9 +123,11 @@ int main(int argc, char *argv[]) {
       input += std::to_string(results_direct->time) + "   ";
       for (int i = 0; i < events - 1; ++i)
          input += std::to_string(results_direct->counters[i]) + "   ";
+#ifdef BUCKET
       input += std::to_string(results_bucket->time) + "   ";
       for (int i = 0; i < events; ++i)
          input += std::to_string(results_bucket->counters[i]) + "   ";
+#endif
       input += std::to_string(results_table->time) + "   ";
       for (int i = 0; i < events - 1; ++i)
          input += std::to_string(results_table->counters[i]) + "   ";
@@ -134,7 +147,9 @@ int main(int argc, char *argv[]) {
       std::cout << length << " Completed" << std::endl;
 
       delete results_direct;
+#ifdef BUCKET
       delete results_bucket;
+#endif
       delete results_eigen;
       delete results_table;
       delete results_parallel;
@@ -147,7 +162,9 @@ int main(int argc, char *argv[]) {
       delete[] table_in[ly];
 
    delete[] out_a;
+#ifdef BUCKET
    delete[] out_b;
+#endif
    delete[] out_d;
    delete[] out_p;
    delete[] table_in;

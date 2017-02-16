@@ -20,7 +20,6 @@
 
 namespace utils {
 
-#define MAP_HUGETLB 0x40000
 #define EVENTS 5
 #define DEBUG 1
 
@@ -53,16 +52,6 @@ void copy(T **source, T **destination, T *pointers_length, size_t layers) {
 
 /******************************************************************************************/
 
-template <typename RandomAccessIterator>
-void KFYShuffle(RandomAccessIterator begin, RandomAccessIterator end) {
-   for (unsigned int n = end - begin - 1; n >= 1; --n) {
-      unsigned int k = rand() % (n + 1);
-      if (k != n) {
-         std::iter_swap(begin + k, begin + n);
-      }
-   }
-}
-
 template <typename T> void random_permutation(T *perm, size_t length) {
 
    std::srand(std::time(nullptr));
@@ -84,8 +73,8 @@ template <typename T> void random_permutation(T *perm, size_t length) {
 template <typename T>
 void random_permutation_table(T **table, size_t length, size_t layers) {
 
-   // std::srand(std::time(nullptr));
-   std::srand(1);
+   std::srand(std::time(nullptr));
+   // std::srand(1);
 
    for (size_t i = 0; i < length; ++i)
       table[0][i] = i;
@@ -165,6 +154,4 @@ template <typename T, typename S> void verify(T *out_p, S *out, size_t length) {
 
    utils::verify(out_p, out, length, false);
 }
-
-
 }

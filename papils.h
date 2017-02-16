@@ -6,10 +6,9 @@
 //  Copyright © 2016 Matteo Dusefante. All rights reserved.
 //
 
-#include <papi.h>
-//#include "papi.h"
 #include <cstring>
 #include <omp.h>
+#include <papi.h>
 #include <string>
 
 #define MAXNE 7
@@ -38,7 +37,7 @@ PAPI_TLB_IM : Instruction translation lookaside buffer misses
 const char *names[] = {"PAPI_L1_TCM", "PAPI_L2_TCM", "PAPI_L3_TCM",
                        "PAPI_TLB_DM"};
 
-const char *tlb[] = {"PAPI_TLB_DM", "PAPI_TLB_IM"};
+// const char *tlb[] = {"PAPI_TLB_DM", "PAPI_TLB_IM"};
 
 #ifdef OLD
 template <typename S> void critical(const S *s) { std::cout << s << std::endl; }
@@ -50,7 +49,6 @@ void papi_init() {
    // papicounter.ne = 2;
 
    papicounter.names = names;
-   // papicounter.names = icm;
    // papicounter.names = tlb;
 
    std::string str;
@@ -134,7 +132,7 @@ void papi_start() {
    start_time = omp_get_wtime();
 
    papicounter.cycles = PAPI_get_virt_cyc();
-   papicounter.real_time = PAPI_get_real_usec();
+   // papicounter.real_time = PAPI_get_real_usec();
    // papicounter.virtual_time = PAPI_get_virt_usec();
 }
 
@@ -145,7 +143,7 @@ void papi_stop() {
    time = omp_get_wtime() - start_time;
 
    papicounter.cycles = PAPI_get_virt_cyc() - papicounter.cycles;
-   papicounter.real_time = PAPI_get_real_usec() - papicounter.real_time;
+   // papicounter.real_time = PAPI_get_real_usec() - papicounter.real_time;
    // papicounter.virtual_time = PAPI_get_virt_usec() -
    // papicounter.virtual_time;
 }
@@ -165,8 +163,8 @@ void papi_print() {
 
 template <typename T> void papi_collect(T *results) {
 
-   // results[0] = papicounter.time;
    results->time = time;
+   // results[0] = papicounter.time;
    // results->time = papicounter.real_time;
    // results->time = papicounter.virtual_time;
 

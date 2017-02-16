@@ -7,7 +7,7 @@
 //
 
 #include "utils.h"
-// dependecies
+// dependencies
 #include "algorithms.h"
 #include "papils.h"
 #pragma GCC diagnostic push
@@ -111,28 +111,42 @@ inline void eigen(T **table_in, T **table_perm,
 /******************************************************************************************/
 
 template <typename T>
-inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *bucket_size,
+inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
                                  __attribute__((unused)) T *control_sample,
                                  T *out, size_t length, size_t layers,
                                  size_t events, size_t cores,
                                  struct utils::data *collection) {
 
-   T **buckets = new T *[layers];
+   T **b_table = new T *[layers];
+   T *bucket_size = new T[layers]();
    omp_lock_t **locks = new omp_lock_t *[layers];
 
    for (size_t ly = 0; ly < layers; ++ly) {
-      size_t nbuckets =
-          length / bucket_size[ly] +
-          (((length / bucket_size[ly]) * bucket_size[ly]) != length);
-      buckets[ly] = new T[nbuckets]();
-      locks[ly] = new omp_lock_t[nbuckets];
-      buckets[ly][0] = 0;
+      bucket_size[ly] = length / buckets[ly] +
+                           (((length / buckets[ly]) * buckets[ly]) != length);
+      b_table[ly] = new T[buckets[ly]]();
+      locks[ly] = new omp_lock_t[buckets[ly]];
+      b_table[ly][0] = 0;
       omp_init_lock(&locks[ly][0]);
-      for (size_t it = 1; it < nbuckets; ++it) {
-         buckets[ly][it] = buckets[ly][it - 1] + bucket_size[ly];
+      for (size_t it = 1; it < (size_t)buckets[ly]; ++it) {
+         b_table[ly][it] = b_table[ly][it - 1] + bucket_size[ly];
          omp_init_lock(&locks[ly][it]);
       }
    }
+
+   // for (size_t ly = 0; ly < layers; ++ly) {
+   //    size_t nbuckets =
+   //        length / bucket_size[ly] +
+   //        (((length / bucket_size[ly]) * bucket_size[ly]) != length);
+   //    buckets[ly] = new T[nbuckets]();
+   //    locks[ly] = new omp_lock_t[nbuckets];
+   //    buckets[ly][0] = 0;
+   //    omp_init_lock(&locks[ly][0]);
+   //    for (size_t it = 1; it < nbuckets; ++it) {
+   //       buckets[ly][it] = buckets[ly][it - 1] + bucket_size[ly];
+   //       omp_init_lock(&locks[ly][it]);
+   //    }
+   // }
 
    utils::data *temp = new utils::data[REP]();
 
@@ -140,7 +154,7 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *bucket_size,
 
       papils::papi_start();
 
-      algorithms::fast_omp_bucketize(&table_in[0], &table_perm[0], &buckets[0],
+      algorithms::fast_omp_bucketize(&table_in[0], &table_perm[0], &b_table[0],
                                      &out[0], &bucket_size[0], &locks[0],
                                      length, layers, cores);
 
@@ -148,12 +162,9 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *bucket_size,
       papils::papi_collect(&temp[rep]);
 
       for (size_t ly = 0; ly < layers; ++ly) {
-         size_t nbuckets =
-             length / bucket_size[ly] +
-             (((length / bucket_size[ly]) * bucket_size[ly]) != length);
-         buckets[ly][0] = 0;
-         for (size_t it = 1; it < nbuckets; ++it) {
-            buckets[ly][it] = buckets[ly][it - 1] + bucket_size[ly];
+         b_table[ly][0] = 0;
+         for (size_t it = 1; it < (size_t)buckets[ly]; ++it) {
+            b_table[ly][it] = b_table[ly][it - 1] + bucket_size[ly];
          }
       }
    }
@@ -173,38 +184,38 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *bucket_size,
    collection->time /= REP;
 
    for (size_t ly = 0; ly < layers; ++ly) {
-      delete[] buckets[ly];
+      delete[] b_table[ly];
       delete[] locks[ly];
    }
 
    delete[] temp;
    delete[] locks;
-   delete[] buckets;
+   delete[] b_table;
 }
 
 /******************************************************************************************/
 
 template <typename T>
-inline void omp_table_algorithm(T **table_in, T **table_perm, T *bucket_size,
+inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
                                 __attribute__((unused)) T *control_sample,
                                 size_t length, size_t layers, size_t events,
                                 size_t cores, struct utils::data *collection) {
 
-   long **table = new T *[layers + 1];
-   long **buckets = new T *[layers];
+   T **table = new T *[layers + 1];
+   T **b_table = new T *[layers];
+   T *bucket_size = new T[layers]();
    omp_lock_t **locks = new omp_lock_t *[layers];
 
    for (size_t ly = 0; ly < layers; ++ly) {
       table[ly] = new T[length]();
-      size_t nbuckets =
-          length / bucket_size[ly] +
-          (((length / bucket_size[ly]) * bucket_size[ly]) != length);
-      buckets[ly] = new T[nbuckets]();
-      locks[ly] = new omp_lock_t[nbuckets];
-      buckets[ly][0] = 0;
+      bucket_size[ly] = length / buckets[ly] +
+                           (((length / buckets[ly]) * buckets[ly]) != length);
+      b_table[ly] = new T[buckets[ly]]();
+      locks[ly] = new omp_lock_t[buckets[ly]];
+      b_table[ly][0] = 0;
       omp_init_lock(&locks[ly][0]);
-      for (size_t it = 1; it < nbuckets; ++it) {
-         buckets[ly][it] = buckets[ly][it - 1] + bucket_size[ly];
+      for (size_t it = 1; it < (size_t)buckets[ly]; ++it) {
+         b_table[ly][it] = b_table[ly][it - 1] + bucket_size[ly];
          omp_init_lock(&locks[ly][it]);
       }
    }
@@ -213,22 +224,20 @@ inline void omp_table_algorithm(T **table_in, T **table_perm, T *bucket_size,
 
    papils::papi_start();
 
-   algorithms::multi_layer_preprocessing(&table[0], &table_perm[0], &buckets[0],
+   algorithms::multi_layer_preprocessing(&table[0], &table_perm[0], &b_table[0],
                                          &bucket_size[0], &locks[0], length,
                                          layers, cores);
 
    papils::papi_stop();
    papils::papi_print();
 
-   return;
-
    for (size_t ly = 0; ly < layers; ++ly) {
-      delete[] buckets[ly];
+      delete[] b_table[ly];
       delete[] locks[ly];
    }
 
    delete[] locks;
-   delete[] buckets;
+   delete[] b_table;
 
    utils::data *temp = new utils::data[REP]();
 
@@ -312,8 +321,6 @@ inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
    papils::papi_stop();
    papils::papi_print();
 
-   return;
-
    utils::data *temp = new utils::data[REP]();
 
    for (size_t rep = 0; rep < REP; ++rep) {
@@ -323,7 +330,8 @@ inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
       papils::papi_start();
 
       // algorithms::parallel_bucket(&table_in[0], &table_perm[0], &table_pt[0],
-      //                             &out[0], &nbuckets[0], &bucket_size[0], cores,
+      //                             &out[0], &nbuckets[0], &bucket_size[0],
+      //                             cores,
       //                             length, layers);
       algorithms::parallel_bucket(&table_in[0], &table_perm[0],
                                   &table_pt_copy[0], &out[0], &bucket_size[0],
