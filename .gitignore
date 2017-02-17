@@ -16,4 +16,4 @@ papi_omp.cpp
 
 CMakeLists.txt
 
-benchmark.cpp
+best_bucket.cpp
