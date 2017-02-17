@@ -1,6 +1,6 @@
 //
+//  An Empirical Evaluation of Permuting in Parallel External Memory
 //  papils.h
-//  project
 //
 //  Created by Matteo Dusefante on 15/02/16.
 //  Copyright © 2016 Matteo Dusefante. All rights reserved.
@@ -39,10 +39,6 @@ const char *names[] = {"PAPI_L1_TCM", "PAPI_L2_TCM", "PAPI_L3_TCM",
 
 // const char *tlb[] = {"PAPI_TLB_DM", "PAPI_TLB_IM"};
 
-#ifdef OLD
-template <typename S> void critical(const S *s) { std::cout << s << std::endl; }
-#endif
-
 void papi_init() {
 
    papicounter.ne = 3;
@@ -60,7 +56,7 @@ void papi_init() {
    if (PAPI_create_eventset(&(papicounter.EventSet)) != PAPI_OK)
       std::cout << "PAPI_create_eventset failed" << std::endl;
 
-   for (int i = 0; i < papicounter.ne; ++i) {
+   for (auto i = 0; i < papicounter.ne; ++i) {
       if (PAPI_event_name_to_code((char *)papicounter.names[i], &event) !=
           PAPI_OK)
          std::cout << "PAPI_event_name_to_code failed" << std::endl;
@@ -108,7 +104,7 @@ void papi_multiplex_init() {
    if (PAPI_set_opt(PAPI_INHERIT, &opt) != PAPI_OK)
       std::cout << "PAPI_set_opt INHERIT failed" << std::endl;
 
-   for (int i = 0; i < papicounter.ne; ++i) {
+   for (auto i = 0; i < papicounter.ne; ++i) {
       if (PAPI_event_name_to_code((char *)papicounter.names[i], &event) !=
           PAPI_OK)
          std::cout << "PAPI_event_name_to_code failed" << std::endl;

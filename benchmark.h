@@ -1,6 +1,6 @@
 //
+//  An Empirical Evaluation of Permuting in Parallel External Memory
 //  benchmark.h
-//  project
 //
 //  Created by Matteo Dusefante on 31/05/16.
 //  Copyright © 2016 Matteo Dusefante. All rights reserved.
@@ -15,6 +15,10 @@
 #include "Eigen/Core"
 #include "Eigen/SparseCore"
 #pragma GCC diagnostic pop
+
+namespace Eigen {
+typedef Matrix<uint32_t, Dynamic, 1> VectorXuint32;
+}
 
 namespace benchmark {
 
@@ -71,9 +75,10 @@ inline void eigen(T **table_in, T **table_perm,
    Eigen::initParallel();
    Eigen::setNbThreads(cores);
 
-   Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> perm(length);
-   Eigen::VectorXi in(length);
-   Eigen::VectorXi out(length);
+   Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic, uint32_t> perm(
+       length);
+   Eigen::VectorXuint32 in(length);
+   Eigen::VectorXuint32 out(length);
 
    for (size_t i = 0; i < length; ++i) {
       in[i] = table_in[0][i];
@@ -119,34 +124,18 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
 
    T **b_table = new T *[layers];
    T *bucket_size = new T[layers]();
-   omp_lock_t **locks = new omp_lock_t *[layers];
+   omp_lock_t *locks = new omp_lock_t[buckets[layers]];
+   for (size_t it = 0; it < buckets[layers]; ++it)
+      omp_init_lock(&locks[it]);
 
    for (size_t ly = 0; ly < layers; ++ly) {
       bucket_size[ly] = length / buckets[ly] +
-                           (((length / buckets[ly]) * buckets[ly]) != length);
+                        (((length / buckets[ly]) * buckets[ly]) != length);
       b_table[ly] = new T[buckets[ly]]();
-      locks[ly] = new omp_lock_t[buckets[ly]];
       b_table[ly][0] = 0;
-      omp_init_lock(&locks[ly][0]);
-      for (size_t it = 1; it < (size_t)buckets[ly]; ++it) {
+      for (size_t it = 1; it < buckets[ly]; ++it)
          b_table[ly][it] = b_table[ly][it - 1] + bucket_size[ly];
-         omp_init_lock(&locks[ly][it]);
-      }
    }
-
-   // for (size_t ly = 0; ly < layers; ++ly) {
-   //    size_t nbuckets =
-   //        length / bucket_size[ly] +
-   //        (((length / bucket_size[ly]) * bucket_size[ly]) != length);
-   //    buckets[ly] = new T[nbuckets]();
-   //    locks[ly] = new omp_lock_t[nbuckets];
-   //    buckets[ly][0] = 0;
-   //    omp_init_lock(&locks[ly][0]);
-   //    for (size_t it = 1; it < nbuckets; ++it) {
-   //       buckets[ly][it] = buckets[ly][it - 1] + bucket_size[ly];
-   //       omp_init_lock(&locks[ly][it]);
-   //    }
-   // }
 
    utils::data *temp = new utils::data[REP]();
 
@@ -163,7 +152,7 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
 
       for (size_t ly = 0; ly < layers; ++ly) {
          b_table[ly][0] = 0;
-         for (size_t it = 1; it < (size_t)buckets[ly]; ++it) {
+         for (size_t it = 1; it < buckets[ly]; ++it) {
             b_table[ly][it] = b_table[ly][it - 1] + bucket_size[ly];
          }
       }
@@ -183,10 +172,8 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
       collection->time += temp[rep].time;
    collection->time /= REP;
 
-   for (size_t ly = 0; ly < layers; ++ly) {
+   for (size_t ly = 0; ly < layers; ++ly)
       delete[] b_table[ly];
-      delete[] locks[ly];
-   }
 
    delete[] temp;
    delete[] locks;
@@ -198,26 +185,25 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
 template <typename T>
 inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
                                 __attribute__((unused)) T *control_sample,
-                                size_t length, size_t layers, size_t events,
-                                size_t cores, struct utils::data *collection) {
+                                T *out, size_t length, size_t layers,
+                                size_t events, size_t cores,
+                                struct utils::data *collection) {
 
    T **table = new T *[layers + 1];
    T **b_table = new T *[layers];
    T *bucket_size = new T[layers]();
-   omp_lock_t **locks = new omp_lock_t *[layers];
+   omp_lock_t *locks = new omp_lock_t[buckets[layers]];
+   for (size_t it = 0; it < buckets[layers]; ++it)
+      omp_init_lock(&locks[it]);
 
    for (size_t ly = 0; ly < layers; ++ly) {
       table[ly] = new T[length]();
       bucket_size[ly] = length / buckets[ly] +
-                           (((length / buckets[ly]) * buckets[ly]) != length);
+                        (((length / buckets[ly]) * buckets[ly]) != length);
       b_table[ly] = new T[buckets[ly]]();
-      locks[ly] = new omp_lock_t[buckets[ly]];
       b_table[ly][0] = 0;
-      omp_init_lock(&locks[ly][0]);
-      for (size_t it = 1; it < (size_t)buckets[ly]; ++it) {
+      for (size_t it = 1; it < buckets[ly]; ++it)
          b_table[ly][it] = b_table[ly][it - 1] + bucket_size[ly];
-         omp_init_lock(&locks[ly][it]);
-      }
    }
 
    table[layers] = new T[length]();
@@ -231,10 +217,8 @@ inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
    papils::papi_stop();
    papils::papi_print();
 
-   for (size_t ly = 0; ly < layers; ++ly) {
+   for (size_t ly = 0; ly < layers; ++ly)
       delete[] b_table[ly];
-      delete[] locks[ly];
-   }
 
    delete[] locks;
    delete[] b_table;
@@ -245,15 +229,15 @@ inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
 
       papils::papi_start();
 
-      algorithms::fast_omp_multi_layer_table(&table_in[0], &table[0], length,
-                                             layers, cores);
+      algorithms::fast_omp_multi_layer_table(&table_in[0], &table[0], &out[0],
+                                             length, layers, cores);
 
       papils::papi_stop();
       papils::papi_collect(&temp[rep]);
    }
 
 #ifdef DEBUG
-   utils::verify(&control_sample[0], &table_in[layers + 1][0], length);
+   utils::verify(&control_sample[0], &out[0], length);
 #endif
 
    for (size_t evnt = 0; evnt < events - 1; ++evnt) {
@@ -297,7 +281,6 @@ inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
 
    size_t size = 0;
 
-   // nbuckets[0] = 1;
    bucket_size[0] = length;
    for (size_t ly = 0; ly < layers; ++ly) {
       // nbuckets[ly + 1] = buckets[ly];

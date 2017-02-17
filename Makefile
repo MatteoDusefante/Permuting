@@ -28,9 +28,10 @@ endif
 CFLAGS = -Wall -Wextra
 CFLAGS += -std=c++11
 CFLAGS += -fopenmp
-CFLAGS += -g #valgrind rows
+#CFLAGS += -g #valgrind rows
 CFLAGS += -lpapi
-CFLAGS += -O3 -pipe -mfpmath=sse -march=native  -funroll-loops #-ffast-math  #-lm O2 #-funroll-all-loops
+CFLAGS += -O3 -pipe -mfpmath=sse -march=native  -funroll-loops -ffast-math
+CFLAGS += -fschedule-insns2 -fprefetch-loop-arrays#-lm O2 #-funroll-all-loops
 
 #TIME = #-lboost_timer
 #LIB = #-I $(BOOST_P) #for boost
