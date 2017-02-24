@@ -22,15 +22,11 @@ typedef Matrix<uint32_t, Dynamic, 1> VectorXuint32;
 
 namespace benchmark {
 
-#define EIGEN 0
-#define FUNC 0
-#define REP 1
-
 template <typename T>
 inline void omp_direct_algorithm(T **table_in, T **table_perm,
                                  __attribute__((unused)) T *control_sample,
-                                 T *out, size_t length, size_t events,
-                                 size_t cores, struct utils::data *collection) {
+                                 T *out, size_t length, size_t cores,
+                                 struct utils::data *collection) {
 
    utils::data *temp = new utils::data[REP]();
 
@@ -45,15 +41,7 @@ inline void omp_direct_algorithm(T **table_in, T **table_perm,
       papils::papi_collect(&temp[rep]);
    }
 
-   for (size_t evnt = 0; evnt < events - 1; ++evnt) {
-      for (size_t rep = 0; rep < REP; ++rep) {
-         collection->counters[evnt] += temp[rep].counters[evnt];
-      }
-      collection->counters[evnt] /= REP;
-   }
-   for (size_t rep = 0; rep < REP; ++rep)
-      collection->time += temp[rep].time;
-   collection->time /= REP;
+   utils::postprocess(&temp[0], &collection[0]);
 
    delete[] temp;
 
@@ -64,11 +52,10 @@ inline void omp_direct_algorithm(T **table_in, T **table_perm,
 
 /******************************************************************************************/
 
-#ifdef EIGEN
 template <typename T>
 inline void eigen(T **table_in, T **table_perm,
                   __attribute__((unused)) T *control_sample, size_t length,
-                  size_t events, size_t cores, struct utils::data *collection) {
+                  size_t cores, struct utils::data *collection) {
 
    utils::data *temp = new utils::data[REP]();
 
@@ -95,23 +82,14 @@ inline void eigen(T **table_in, T **table_perm,
       papils::papi_collect(&temp[rep]);
    }
 
+   utils::postprocess(&temp[0], &collection[0]);
+
 #ifdef DEBUG
    utils::verify(&control_sample[0], &out[0], length);
 #endif
 
-   for (size_t evnt = 0; evnt < events - 1; ++evnt) {
-      for (size_t rep = 0; rep < REP; ++rep) {
-         collection->counters[evnt] += temp[rep].counters[evnt];
-      }
-      collection->counters[evnt] /= (REP * 2);
-   }
-   for (size_t rep = 0; rep < REP; ++rep)
-      collection->time += temp[rep].time;
-   collection->time /= (REP * 2);
-
    delete[] temp;
 }
-#endif
 
 /******************************************************************************************/
 
@@ -119,8 +97,7 @@ template <typename T>
 inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
                                  __attribute__((unused)) T *control_sample,
                                  T *out, size_t length, size_t layers,
-                                 size_t events, size_t cores,
-                                 struct utils::data *collection) {
+                                 size_t cores, struct utils::data *collection) {
 
    T **b_table = new T *[layers];
    T *bucket_size = new T[layers]();
@@ -143,9 +120,8 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
 
       papils::papi_start();
 
-      algorithms::fast_omp_bucketize(&table_in[0], &table_perm[0], &b_table[0],
-                                     &out[0], &bucket_size[0], &locks[0],
-                                     length, layers, cores);
+      algorithms::bucketize(&table_in[0], &table_perm[0], &b_table[0], &out[0],
+                            &bucket_size[0], &locks[0], length, layers, cores);
 
       papils::papi_stop();
       papils::papi_collect(&temp[rep]);
@@ -158,19 +134,11 @@ inline void omp_bucket_algorithm(T **table_in, T **table_perm, T *buckets,
       }
    }
 
+   utils::postprocess(&temp[0], &collection[0]);
+
 #ifdef DEBUG
    utils::verify(&control_sample[0], &out[0], length);
 #endif
-
-   for (size_t evnt = 0; evnt < events - 1; ++evnt) {
-      for (size_t rep = 0; rep < REP; ++rep) {
-         collection->counters[evnt] += temp[rep].counters[evnt];
-      }
-      collection->counters[evnt] /= REP;
-   }
-   for (size_t rep = 0; rep < REP; ++rep)
-      collection->time += temp[rep].time;
-   collection->time /= REP;
 
    for (size_t ly = 0; ly < layers; ++ly)
       delete[] b_table[ly];
@@ -186,14 +154,13 @@ template <typename T>
 inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
                                 __attribute__((unused)) T *control_sample,
                                 T *out, size_t length, size_t layers,
-                                size_t events, size_t cores,
-                                struct utils::data *collection) {
+                                size_t cores, struct utils::data *collection) {
 
    T **table = new T *[layers + 1];
    T **b_table = new T *[layers];
    T *bucket_size = new T[layers]();
-   omp_lock_t *locks = new omp_lock_t[buckets[layers]];
-   for (size_t it = 0; it < buckets[layers]; ++it)
+   omp_lock_t *locks = new omp_lock_t[buckets[layers - 1]];
+   for (size_t it = 0; it < buckets[layers - 1]; ++it)
       omp_init_lock(&locks[it]);
 
    for (size_t ly = 0; ly < layers; ++ly) {
@@ -210,18 +177,18 @@ inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
 
    papils::papi_start();
 
-   algorithms::multi_layer_preprocessing(&table[0], &table_perm[0], &b_table[0],
-                                         &bucket_size[0], &locks[0], length,
-                                         layers, cores);
-
+   algorithms::multi_layer_table_preprocessing(
+       &table[0], &table_perm[0], &b_table[0], &bucket_size[0], &locks[0],
+       length, layers, cores);
    papils::papi_stop();
-   papils::papi_print();
+   // papils::papi_print();
 
    for (size_t ly = 0; ly < layers; ++ly)
       delete[] b_table[ly];
 
    delete[] locks;
    delete[] b_table;
+   delete[] bucket_size;
 
    utils::data *temp = new utils::data[REP]();
 
@@ -229,26 +196,20 @@ inline void omp_table_algorithm(T **table_in, T **table_perm, T *buckets,
 
       papils::papi_start();
 
-      algorithms::fast_omp_multi_layer_table(&table_in[0], &table[0], &out[0],
-                                             length, layers, cores);
+      algorithms::multi_layer_table(&table_in[0], &table[0], &out[0], length,
+                                    layers, cores);
 
       papils::papi_stop();
       papils::papi_collect(&temp[rep]);
    }
 
 #ifdef DEBUG
+   for (size_t it = 0; it < length; ++it)
+      out[it] = table_in[layers + 1][it];
    utils::verify(&control_sample[0], &out[0], length);
 #endif
 
-   for (size_t evnt = 0; evnt < events - 1; ++evnt) {
-      for (size_t rep = 0; rep < REP; ++rep) {
-         collection->counters[evnt] += temp[rep].counters[evnt];
-      }
-      collection->counters[evnt] /= REP;
-   }
-   for (size_t rep = 0; rep < REP; ++rep)
-      collection->time += temp[rep].time;
-   collection->time /= REP;
+   utils::postprocess(&temp[0], &collection[0]);
 
    for (size_t ly = 0; ly < layers + 1; ++ly)
       delete[] table[ly];
@@ -263,8 +224,7 @@ template <typename T>
 inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
                                __attribute__((unused)) T *control_sample,
                                T *out, size_t length, size_t layers,
-                               size_t events, size_t cores,
-                               struct utils::data *collection) {
+                               size_t cores, struct utils::data *collection) {
 
    T *pointers_length = new T[layers];
    T *bucket_size = new T[layers + 1];
@@ -302,7 +262,7 @@ inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
                                              cores, length, layers, delta);
 
    papils::papi_stop();
-   papils::papi_print();
+   // papils::papi_print();
 
    utils::data *temp = new utils::data[REP]();
 
@@ -328,15 +288,7 @@ inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
    utils::verify(&control_sample[0], &out[0], length);
 #endif
 
-   for (size_t evnt = 0; evnt < events - 1; ++evnt) {
-      for (size_t rep = 0; rep < REP; ++rep) {
-         collection->counters[evnt] += temp[rep].counters[evnt];
-      }
-      collection->counters[evnt] /= REP;
-   }
-   for (size_t rep = 0; rep < REP; ++rep)
-      collection->time += temp[rep].time;
-   collection->time /= REP;
+   utils::postprocess(&temp[0], &collection[0]);
 
    delete[] temp;
 
@@ -345,8 +297,9 @@ inline void parallel_algorithm(T **table_in, T **table_perm, T *buckets,
       delete[] table_pt_copy[ly];
    }
 
-   delete[] pointers_length;
    delete[] table_pt;
+   delete[] bucket_size;
    delete[] table_pt_copy;
+   delete[] pointers_length;
 }
 }

@@ -20,7 +20,8 @@ inline void permute(T *in, T *out, P *perm, size_t length) {
 /******************************************************************************************/
 
 template <typename T, typename P>
-inline void omp_permute(T const *in, T *out, P const *perm, size_t length, size_t cores) {
+inline void omp_permute(T const *in, T *out, P const *perm, size_t length,
+                        size_t cores) {
 
    size_t it;
    omp_set_dynamic(0);
@@ -34,9 +35,9 @@ inline void omp_permute(T const *in, T *out, P const *perm, size_t length, size_
 /******************************************************************************************/
 
 template <typename T, typename S>
-inline void fast_omp_bucketize(T **table_in, T **table_perm, T **buckets,
-                               T *out, T *bucket_size, S *locks, size_t length,
-                               size_t layers, size_t cores) {
+inline void bucketize(T **table_in, T **table_perm, T **buckets, T *out,
+                      T *bucket_size, S *locks, size_t length, size_t layers,
+                      size_t cores) {
 
    size_t it, index, bucket;
 
@@ -63,9 +64,10 @@ inline void fast_omp_bucketize(T **table_in, T **table_perm, T **buckets,
 /******************************************************************************************/
 
 template <typename T, typename S>
-inline void multi_layer_preprocessing(T **table, T **table_perm, T **buckets,
-                                      T *bucket_size, S *locks, size_t length,
-                                      size_t layers, size_t cores) {
+inline void multi_layer_table_preprocessing(T **table, T **table_perm,
+                                            T **buckets, T *bucket_size,
+                                            S *locks, size_t length,
+                                            size_t layers, size_t cores) {
 
    size_t it, index, bucket;
    omp_set_dynamic(0);
@@ -82,6 +84,7 @@ inline void multi_layer_preprocessing(T **table, T **table_perm, T **buckets,
          table_perm[ly + 1][index] = table_perm[ly][it];
       }
    }
+
 #pragma omp parallel for private(it)
    for (it = 0; it < length; ++it)
       table[layers][it] = table_perm[layers][it];
@@ -90,22 +93,19 @@ inline void multi_layer_preprocessing(T **table, T **table_perm, T **buckets,
 /******************************************************************************************/
 
 template <typename T>
-inline void fast_omp_multi_layer_table(T **table_out, T **table, T *out,
-                                       size_t length, size_t layers,
-                                       size_t cores) {
+inline void multi_layer_table(T **table_out, T **table,
+                              __attribute__((unused)) T *out, size_t length,
+                              size_t layers, size_t cores) {
 
    size_t it;
    omp_set_dynamic(0);
    omp_set_num_threads(cores);
 
-   for (size_t ly = 0; ly < layers; ++ly)
+   for (size_t ly = 0; ly < layers + 1; ++ly) {
 #pragma omp parallel for private(it)
       for (it = 0; it < length; ++it)
          table_out[ly + 1][table[ly][it]] = table_out[ly][it];
-
-#pragma omp parallel for private(it)
-   for (it = 0; it < length; ++it)
-      out[table[layers][it]] = table_out[layers][it];
+   }
 }
 
 /******************************************************************************************/
@@ -168,10 +168,9 @@ inline void parallel_bucket_preprocessing(T **table_perm, T **table_pt,
 /******************************************************************************************/
 
 template <typename T>
-inline void parallel_bucket(T **table_in, T **table_perm,
-                            T **table_pt, T *out, T *bucket_size,
-                            T *buckets, size_t cores, size_t length,
-                            size_t layers, size_t delta) {
+inline void parallel_bucket(T **table_in, T **table_perm, T **table_pt, T *out,
+                            T *bucket_size, T *buckets, size_t cores,
+                            size_t length, size_t layers, size_t delta) {
 
    size_t c, it, index, bucket;
 

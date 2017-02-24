@@ -1,6 +1,6 @@
 //
 //  An Empirical Evaluation of Permuting in Parallel External Memory
-//  benchmark.cpp
+//  best_bucket.cpp
 //
 //  Created by Matteo Dusefante on 31/05/16.
 //  Copyright © 2016 Matteo Dusefante. All rights reserved.
@@ -8,15 +8,14 @@
 
 #include "benchmark.h"
 
-#define start 1000000
-#define end 1000000
-#define delta 1000000
+#define length 1000000
+#define str_bucket 1000
+#define end_bucket 1000
+#define delta 1000
 #define layers 1
 
 int main(__attribute__((unused)) int argc,
          __attribute__((unused)) char *argv[]) {
-
-   uint32_t nbuckets[] = {10000};
 
    papils::papi_multiplex_init();
    std::ofstream outfile;
@@ -24,24 +23,24 @@ int main(__attribute__((unused)) int argc,
 
    std::string input = "";
 
-   uint32_t *out_p = new uint32_t[end];
-   uint32_t *out = new uint32_t[end];
+   uint32_t *out_p = new uint32_t[length];
+   uint32_t *out = new uint32_t[length];
 
    uint32_t **table_perm = new uint32_t *[layers + 1];
    uint32_t **table_in = new uint32_t *[layers + 2];
 
    for (size_t ly = 0; ly < layers + 1; ++ly)
-      table_perm[ly] = new uint32_t[end];
+      table_perm[ly] = new uint32_t[length];
 
    for (size_t ly = 0; ly < layers + 2; ++ly)
-      table_in[ly] = new uint32_t[end];
+      table_in[ly] = new uint32_t[length];
 
    std::cout << "Start..." << std::endl;
 
-   input += "#start=" + std::to_string(delta) + " delta=" +
-            std::to_string(delta) + " end=" + std::to_string(end) + " layers=" +
-            std::to_string(layers) + " nb=" + std::to_string(nbuckets[0]) +
-            "\n";
+   input += "#start=" + std::to_string(str_bucket) + " delta=" +
+            std::to_string(delta) + " end=" + std::to_string(end_bucket) +
+            " layers=" + std::to_string(layers) + " length=" +
+            std::to_string(length) + "\n";
 
    size_t cores = std::thread::hardware_concurrency();
 
@@ -59,24 +58,25 @@ int main(__attribute__((unused)) int argc,
    results_table = new utils::data();
    results_parallel = new utils::data();
 
-   for (size_t length = start; length < end + delta; length += delta) {
-
-      utils::random_permutation(&table_perm[0][0], length);
-      utils::populate(&table_in[0][0], length);
+   utils::random_permutation(&table_perm[0][0], length);
+   utils::populate(&table_in[0][0], length);
 
 #ifdef DEBUG
-      algorithms::permute(&table_in[0][0], &out_p[0], &table_perm[0][0],
-                          length);
+   algorithms::permute(&table_in[0][0], &out_p[0], &table_perm[0][0], length);
 #endif
 
-      benchmark::omp_direct_algorithm(&table_in[0], &table_perm[0], &out_p[0],
-                                      &out[0], length, cores, results_direct);
-      utils::clean(&out[0], length);
+   benchmark::omp_direct_algorithm(&table_in[0], &table_perm[0], &out_p[0],
+                                   &out[0], length, cores, results_direct);
+   utils::clean(&out[0], length);
 
-      benchmark::eigen(&table_in[0], &table_perm[0], &out_p[0], length, cores,
-                       results_eigen);
+   benchmark::eigen(&table_in[0], &table_perm[0], &out_p[0], length, cores,
+                    results_eigen);
 
-      utils::clean(&out[0], length);
+   utils::clean(&out[0], length);
+
+   for (uint32_t nb = str_bucket; nb < end_bucket + delta; nb += delta) {
+
+      uint32_t nbuckets[] = {nb};
 
 #ifdef BUCKET
       benchmark::omp_bucket_algorithm(&table_in[0], &table_perm[0],
@@ -89,7 +89,6 @@ int main(__attribute__((unused)) int argc,
       benchmark::omp_table_algorithm(&table_in[0], &table_perm[0], &nbuckets[0],
                                      &out_p[0], &out[0], length, layers, cores,
                                      results_table);
-
       utils::clean(&out[0], length);
 
       benchmark::parallel_algorithm(&table_in[0], &table_perm[0], &nbuckets[0],
@@ -97,7 +96,7 @@ int main(__attribute__((unused)) int argc,
                                     results_parallel);
       utils::clean(&out[0], length);
 
-      input += std::to_string(length) + "   ";
+      input += std::to_string(nb) + "   ";
       input += std::to_string(results_direct->time) + "   ";
       for (size_t i = 0; i < EVENTS - 1; ++i)
          input += std::to_string(results_direct->counters[i]) + "   ";
@@ -122,7 +121,7 @@ int main(__attribute__((unused)) int argc,
 
       input = "";
 
-      std::cout << length << " Completed" << std::endl;
+      std::cout << nb << " Completed" << std::endl;
    }
 
    delete results_direct;

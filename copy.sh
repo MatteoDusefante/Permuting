@@ -19,7 +19,7 @@ if [ $1 = "test" ]; then
 fi
 
 
-scp -P 41122 papils.h Makefile papi_omp.cpp madu@sssgate.itu.dk:~/
+scp -P 41122 papils.h Makefile madu@sssgate.itu.dk:~/
 
 if [ $# -eq 0 ]; then
     exit 0

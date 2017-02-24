@@ -1,7 +1,7 @@
 CURRENT_PATH=.
 PERM=permutation
-#BEN=best_bucket
-BEN=benchmark
+BEN=best_bucket
+#BEN=benchmark
 #BEN=papi_test
 SPMXV=spmxv
 
@@ -28,7 +28,7 @@ endif
 CFLAGS = -Wall -Wextra
 CFLAGS += -std=c++11
 CFLAGS += -fopenmp
-#CFLAGS += -g #valgrind rows
+CFLAGS += -g #valgrind rows
 CFLAGS += -lpapi
 CFLAGS += -O3 -pipe -mfpmath=sse -march=native  -funroll-loops -ffast-math
 CFLAGS += -fschedule-insns2 -fprefetch-loop-arrays#-lm O2 #-funroll-all-loops

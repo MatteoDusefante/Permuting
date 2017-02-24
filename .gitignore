@@ -15,5 +15,3 @@ utl.h
 papi_omp.cpp
 
 CMakeLists.txt
-
-best_bucket.cpp
